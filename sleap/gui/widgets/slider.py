@@ -1,9 +1,26 @@
 """
 Drop-in replacement for QSlider with additional features.
+
+LMS IMPORTANT PATCH [23-June-2025]:
+
+Fixed PySide2 TypeError in QGraphicsScene.addRect and setRect calls.
+
+Issue: PySide2 >=5.15 enforces that addRect() and setRect() must be called with QRectF, not QRect.
+Previous usage of QRect caused:
+    TypeError: argument 1 has unexpected type 'QRect'
+
+Fix: All QRect instances passed to addRect() or setRect() were converted to QRectF.
+These changes are marked in the code with comments containing # !!! for easy identification.
+
+Reference: PySide2/PyQt API expects QRectF in QGraphicsScene drawing methods.
+
+Make sure to keep this in mind when upgrading Qt/PySide2 or modifying graphics code.
+
 """
 
 from qtpy import QtCore, QtWidgets, QtGui
 from qtpy.QtGui import QPen, QBrush, QColor, QKeyEvent, QPolygonF, QPainterPath
+from PySide2.QtCore import QRectF
 
 from sleap.gui.color import ColorManager
 
@@ -208,21 +225,21 @@ class VideoSlider(QtWidgets.QGraphicsView):
         )
         self.setMinimumHeight(self._min_height)
         self.setMaximumHeight(self._min_height)
-        self.handle = self.scene.addRect(handle_rect)
+        self.handle = self.scene.addRect(QtCore.QRectF(handle_rect)) # !!! Converted QRect to QRectF to fix PySide2 addRect() TypeError
         self.handle.setPen(QPen(QColor(80, 80, 80)))
         self.handle.setBrush(QColor(128, 128, 128, 128))
 
         # Add (hidden) rect to highlight selection
         self.select_box = self.scene.addRect(
-            QtCore.QRect(0, 1, 0, outline_rect.height() - 2)
-        )
+            QtCore.QRectF(0, 1, 0, outline_rect.height() - 2)
+        ) # !!! Converted QRect to QRectF to fix PySide2 addRect() TypeError
         self.select_box.setPen(QPen(QColor(80, 80, 255)))
         self.select_box.setBrush(QColor(80, 80, 255, 128))
         self.select_box.hide()
 
         self.zoom_box = self.scene.addRect(
-            QtCore.QRect(0, 1, 0, outline_rect.height() - 2)
-        )
+            QtCore.QRectF(0, 1, 0, outline_rect.height() - 2)
+        ) # !!! Converted QRect to QRectF to fix PySide2 addRect() TypeError
         self.zoom_box.setPen(QPen(QColor(80, 80, 80, 64)))
         self.zoom_box.setBrush(QColor(80, 80, 80, 64))
         self.zoom_box.hide()
@@ -495,7 +512,7 @@ class VideoSlider(QtWidgets.QGraphicsView):
             self.box_rect.height(),
         )
 
-        box_object.setRect(box_rect)
+        box_object.setRect(QtCore.QRectF(box_rect)) # !!! Converted QRect to QRectF to fix PySide2 addRect() TypeError
         box_object.show()
 
     def _update_selection_boxes_on_resize(self):
