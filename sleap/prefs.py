@@ -5,7 +5,8 @@ Importing this module creates `prefs`, instance of `Preferences` class.
 """
 
 from sleap import util
-
+import yaml # !!!
+from yaml.representer import RepresenterError # !!!
 
 class Preferences(object):
     """Class for accessing SLEAP preferences."""
@@ -55,8 +56,33 @@ class Preferences(object):
                 self._prefs[k] = v
 
     def save(self):
-        """Save preferences to file."""
-        util.save_config_yaml(self._filename, self._prefs)
+        # """Save preferences to file."""
+        # util.save_config_yaml(self._filename, self._prefs) # !!! Commented out from original code -- see below
+        """Save preferences to file, avoiding unserializable Python objects."""
+        # Remove Qt window state before saving since it may serialize as a non-importable object
+        # (e.g., `!!python/object/apply:None._unpickle_type`) which causes PyYAML to crash on load.
+        def sanitize(obj):
+            if isinstance(obj, dict):
+                new_dict = {}
+                for k, v in obj.items():
+                    # Skip PyQt5 GUI state
+                    if k == "window state":
+                        continue
+                    new_dict[k] = sanitize(v)
+                return new_dict
+            elif isinstance(obj, list):
+                return [sanitize(v) for v in obj]
+            else:
+                try:
+                    yaml.dump(obj)
+                    return obj
+                except (RepresenterError, TypeError, AttributeError):
+                    return None
+        try:
+            cleaned_prefs = sanitize(self._prefs)
+            util.save_config_yaml(self._filename, cleaned_prefs)
+        except Exception as e:
+            print(f"Error saving preferences: {e}")
 
     def reset_to_default(self):
         """Reset preferences to default."""
